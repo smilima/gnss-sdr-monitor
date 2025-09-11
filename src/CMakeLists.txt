@@ -69,7 +69,8 @@ set(RESOURCES
     resources.qrc
 )
 
-add_executable(${TARGET} ${SOURCES} ${UI_SOURCES} ${RESOURCES})
+add_executable(${TARGET} ${SOURCES} ${UI_SOURCES} ${RESOURCES}
+    skyplot_widget.cpp skyplot_widget.h)
 
 target_link_libraries(${TARGET} PUBLIC ${QT5_LIBRARIES} Boost::boost protobuf::libprotobuf)
 
