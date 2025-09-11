@@ -70,9 +70,6 @@ void SkyPlotWidget::updateReceiverPosition(const gnss_sdr::MonitorPvt &monitor_p
     m_receiverHeight = monitor_pvt.height();
     m_currentGpsTime = monitor_pvt.rx_time();
     m_hasReceiverPosition = true;
-    
-    // qDebug() << "SkyPlot: Receiver position updated - Lat:" << m_receiverLat 
-    //          << "Lon:" << m_receiverLon << "Height:" << m_receiverHeight;
 }
 
 /*!
@@ -80,12 +77,7 @@ void SkyPlotWidget::updateReceiverPosition(const gnss_sdr::MonitorPvt &monitor_p
  Simplified approach that mirrors the tableView without interfering.
  */
 void SkyPlotWidget::updateSatellites(const gnss_sdr::Observables &observables)
-{
-    // qDebug() << "\n=== UPDATE SATELLITES ===";
-    // qDebug() << "Received observables count:" << observables.observable_size();
-    // qDebug() << "Current map size before update:" << m_satellites.size();
-    // qDebug() << "Has receiver position:" << m_hasReceiverPosition;
-    
+{  
     //Mark all existing satellites as not seen in this update
     for (auto &pair : m_satellites) {
         pair.second.seenInThisUpdate = false;
@@ -164,8 +156,8 @@ void SkyPlotWidget::updateSatellites(const gnss_sdr::Observables &observables)
  */
 void SkyPlotWidget::clear()
 {
-    m_satellites.clear();
-    m_hasReceiverPosition = false;
+    //m_satellites.clear();
+    //m_hasReceiverPosition = false;
     update();
 }
 
@@ -231,7 +223,7 @@ void SkyPlotWidget::drawGrid(QPainter &painter, const QRect &plotArea)
     for (int elev = 30; elev <= 90; elev += 30)
     {
         int circleRadius = radius * (90 - elev) / 90;
-        painter.drawEllipse(center, circleRadius, circleRadius);
+        painter.drawEllipse(center, circleRadius - characterWidth, circleRadius - characterWidth);
     }
 
     // Draw outer circle (horizon)
@@ -296,10 +288,6 @@ void SkyPlotWidget::drawSatellites(QPainter &painter, const QRect &plotArea)
 {
     painter.save();
     
-    // qDebug() << "=== DRAWING SATELLITES ===";
-    // qDebug() << "Map size:" << m_satellites.size();
-    
-    // int drawnCount = 0;
     for (const auto &pair : m_satellites)
     {
         const SatelliteInfo &sat = pair.second;
@@ -309,17 +297,14 @@ void SkyPlotWidget::drawSatellites(QPainter &painter, const QRect &plotArea)
         QPointF pos = polarToCartesian(sat.elevation, sat.azimuth, plotArea);
         QColor color = getSystemColor(sat.system);
         
-        // qDebug() << "Drawing satellite" << drawnCount << "- Channel:" << sat.channel_id 
-        //          << "PRN:" << sat.prn << "Position:" << pos 
-        //          << "Elevation:" << sat.elevation << "Azimuth:" << sat.azimuth;
-        
-        // All satellites get the same treatment - no validity distinction
-        
         // Adjust satellite size based on CN0
         int satSize = 8;
-        if (sat.cn0 > 40) satSize = 12;
-        else if (sat.cn0 > 35) satSize = 10;
-        else if (sat.cn0 < 25) satSize = 6;
+        if (sat.cn0 > 40)
+            satSize = 12;
+        else if (sat.cn0 > 35)
+            satSize = 10;
+        else if (sat.cn0 < 25)
+            satSize = 6;
         
         // Draw satellite circle
         painter.setBrush(QBrush(color));
@@ -340,9 +325,6 @@ void SkyPlotWidget::drawSatellites(QPainter &painter, const QRect &plotArea)
         
         painter.drawText(pos.x() - textWidth/2, pos.y() + textHeight/3, prnText);
     }
-    
-    // qDebug() << "Total satellites drawn:" << drawnCount;
-    // qDebug() << "=== END DRAWING ===";
     
     painter.restore();
 }

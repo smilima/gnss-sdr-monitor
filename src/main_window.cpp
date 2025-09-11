@@ -36,14 +36,13 @@
 #include "doppler_delegate.h"
 #include "led_delegate.h"
 #include "preferences_dialog.h"
+#include "skyplot_widget.h"
 #include "ui_main_window.h"
 #include <QDebug>
 #include <QQmlContext>
 #include <QtCharts>
 #include <QtNetwork/QHostAddress>
 #include <QtNetwork/QNetworkDatagram>
-#include <iostream>
-#include <sstream>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -74,6 +73,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_mapWidget->setResizeMode(QQuickWidget::SizeRootObjectToView);
     m_mapDockWidget->setWidget(m_mapWidget);
     addDockWidget(Qt::TopDockWidgetArea, m_mapDockWidget);
+    m_mapDockWidget->setHidden(true);
 
     // Altitude widget.
     m_altitudeDockWidget = new QDockWidget("Altitude", this);
@@ -82,6 +82,7 @@ MainWindow::MainWindow(QWidget *parent)
     addDockWidget(Qt::TopDockWidgetArea, m_altitudeDockWidget);
     connect(m_monitorPvtWrapper, &MonitorPvtWrapper::altitudeChanged, m_altitudeWidget, &AltitudeWidget::addData);
     connect(&m_updateTimer, &QTimer::timeout, m_altitudeWidget, &AltitudeWidget::redraw);
+    m_altitudeDockWidget->setHidden(true);
 
     // Dilution of precision widget.
     m_DOPDockWidget = new QDockWidget("DOP", this);
@@ -90,6 +91,13 @@ MainWindow::MainWindow(QWidget *parent)
     addDockWidget(Qt::TopDockWidgetArea, m_DOPDockWidget);
     connect(m_monitorPvtWrapper, &MonitorPvtWrapper::dopChanged, m_DOPWidget, &DOPWidget::addData);
     connect(&m_updateTimer, &QTimer::timeout, m_DOPWidget, &DOPWidget::redraw);
+    m_DOPDockWidget->setHidden(true);
+
+    // SkyPlot widget.
+    m_skyplotDockWidget = new QDockWidget("Sky Plot", this);
+    m_skyplotWidget = new SkyPlotWidget(m_skyplotDockWidget);
+    m_skyplotDockWidget->setWidget(m_skyplotWidget);
+    addDockWidget(Qt::TopDockWidgetArea, m_skyplotDockWidget);
 
     // QMenuBar.
     ui->actionQuit->setIcon(QIcon::fromTheme("application-exit"));
@@ -112,6 +120,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->mainToolBar->addAction(m_mapDockWidget->toggleViewAction());
     ui->mainToolBar->addAction(m_altitudeDockWidget->toggleViewAction());
     ui->mainToolBar->addAction(m_DOPDockWidget->toggleViewAction());
+    ui->mainToolBar->addAction(m_skyplotDockWidget->toggleViewAction());
     m_start->setEnabled(false);
     m_stop->setEnabled(true);
     m_clear->setEnabled(false);
@@ -217,6 +226,7 @@ void MainWindow::receiveGnssSynchro()
         if (m_stop->isEnabled())
         {
             m_model->populateChannels(&m_stocks);
+            m_skyplotWidget->updateSatellites(m_stocks);
             m_clear->setEnabled(true);
         }
     }
@@ -249,6 +259,7 @@ void MainWindow::clearEntries()
 
     m_altitudeWidget->clear();
     m_DOPWidget->clear();
+    //m_skyplotWidget->clear();
 
     m_clear->setEnabled(false);
 }
