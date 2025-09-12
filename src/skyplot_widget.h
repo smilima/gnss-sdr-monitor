@@ -3,7 +3,7 @@
  * \brief Interface of a widget that shows satellites being tracked
  * in a polar sky plot with support for real and computed satellite positions.
  *
- * \author Claude Assistant, 2025.
+ * \author Andrew Smilie (smilima) with assistance from  Claude Assistant, 2025.
  *
  * -----------------------------------------------------------------------
  *

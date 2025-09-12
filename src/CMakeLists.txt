@@ -86,7 +86,8 @@ set(RESOURCES
     resources.qrc
 )
 
-add_executable(${TARGET} ${HEADERS} ${SOURCES} ${UI_SOURCES} ${RESOURCES})
+add_executable(${TARGET} ${HEADERS} ${SOURCES} ${UI_SOURCES} ${RESOURCES}
+    ../screenshots/gnss-sdr-monitor-skyplot.png)
 
 target_link_libraries(${TARGET} PUBLIC ${QT5_LIBRARIES} Boost::boost protobuf::libprotobuf)
 

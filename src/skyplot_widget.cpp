@@ -3,7 +3,7 @@
  * \brief Implementation of a widget that shows satellites being tracked
  * in a polar sky plot with support for real and computed satellite positions.
  *
- * \author Claude Assistant, 2025.
+ * \author Andrew Smilie (smilima) with assistance from Claude Assistant, 2025.
  *
  * -----------------------------------------------------------------------
  *
@@ -451,21 +451,21 @@ void SkyPlotWidget::drawGrid(QPainter &painter, const QRect &plotArea)
     int labelRadius = radius + labelOffset;
     
     // Ensure we don't go outside plot area bounds
-    int maxLabelRadius = std::min(plotArea.width()/2 - fm.width("W")/2, 
+    int maxLabelRadius = std::min(plotArea.width()/2 - fm.horizontalAdvance("W")/2,
                                   plotArea.height()/2 - fm.height()/2) - 5;
     labelRadius = std::min(labelRadius, maxLabelRadius);
     
     // North - above circle
-    painter.drawText(center.x() - fm.width("N")/2, center.y() - labelRadius + fm.height()/2, "N");
+    painter.drawText(center.x() - fm.horizontalAdvance("N")/2, center.y() - labelRadius + fm.height()/2, "N");
     
     // East - right of circle
-    painter.drawText(center.x() + labelRadius - fm.width("E")/2, center.y() + fm.height()/2, "E");
+    painter.drawText(center.x() + labelRadius - fm.horizontalAdvance("E")/2, center.y() + fm.height()/2, "E");
     
     // South - below circle
-    painter.drawText(center.x() - fm.width("S")/2, center.y() + labelRadius + fm.height()/2, "S");
+    painter.drawText(center.x() - fm.horizontalAdvance("S")/2, center.y() + labelRadius + fm.height()/2, "S");
     
     // West - left of circle
-    painter.drawText(center.x() - labelRadius - fm.width("W")/2, center.y() + fm.height()/2, "W");
+    painter.drawText(center.x() - labelRadius - fm.horizontalAdvance("W")/2, center.y() + fm.height()/2, "W");
     
     // Draw elevation labels
     labelFont.setPointSize(std::max(7, radius / 25)); // Scale elevation labels
@@ -548,7 +548,7 @@ void SkyPlotWidget::drawSatellites(QPainter &painter, const QRect &plotArea)
         
         QFontMetrics fm(font);
         QString prnText = QString::number(sat.prn);
-        int textWidth = fm.width(prnText);
+        int textWidth = fm.horizontalAdvance(prnText);
         int textHeight = fm.height();
         
         painter.drawText(pos.x() - textWidth/2, pos.y() + textHeight/3, prnText);
