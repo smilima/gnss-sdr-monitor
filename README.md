@@ -11,6 +11,8 @@ This program is a graphical user interface developed with [Qt](https://www.qt.io
 <table style="width:100%">
   <tr>
     <td><img src="./screenshots/gnss-sdr-monitor_constellation.png"/></td>
+    <td><img src="./screenshots/gnss-sdr-monitor_skyplot.png"/></td>
+    <td><img src="./screenshots/gnss-sdr-monitor-skyplot.png/></td>
     <td><img src="./screenshots/gnss-sdr-monitor_cn0.png"/></td>
     <td><img src="./screenshots/gnss-sdr-monitor_doppler.png"/></td>
   </tr>
