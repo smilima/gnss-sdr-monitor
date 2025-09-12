@@ -43,6 +43,9 @@
 #include <QtCharts>
 #include <QtNetwork/QHostAddress>
 #include <QtNetwork/QNetworkDatagram>
+#include <QLabel>
+#include <QDateTime>
+#include <cmath>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -128,6 +131,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_stop, &QAction::triggered, this, &MainWindow::toggleCapture);
     connect(m_clear, &QAction::triggered, this, &MainWindow::clearEntries);
     connect(m_closePlotsAction, &QAction::triggered, this, &MainWindow::closePlots);
+
+    // Status Bar Setup
+    m_gpsTimeLabel = new QLabel(this);
+    m_gpsTimeLabel->setText("UTC Time: N/A");
+    statusBar()->addWidget(m_gpsTimeLabel);
 
     // Model.
     m_model = new ChannelTableModel();
@@ -236,6 +244,10 @@ void MainWindow::receiveGnssSynchro()
     }
 }
 
+// main_window.cpp
+
+// main_window.cpp
+
 void MainWindow::receiveMonitorPvt()
 {
     while (m_socketMonitorPvt->hasPendingDatagrams())
@@ -247,12 +259,40 @@ void MainWindow::receiveMonitorPvt()
         {
             m_monitorPvtWrapper->addMonitorPvt(m_monitorPvt);
 
-            // Update sky plot with receiver position if coordinates are valid
+            double receiver_tow = m_monitorPvt.rx_time();
+            uint32_t receiver_week = m_monitorPvt.week();
+
+                    // A valid fix requires a week number > 0 and a valid Time-of-Week.
+            if (receiver_week > 0 && receiver_tow >= 0.0 && receiver_tow < 604800)
+            {
+                // Constants for GPS time conversion
+                const QDateTime gps_epoch(QDate(1980, 1, 6), QTime(0, 0, 0), Qt::UTC);
+                const int leap_seconds = 18; // Current GPS-UTC leap second offset
+                const int secs_in_week = 604800;
+
+                        // Calculate the total seconds from GPS epoch using the received week and TOW
+                qint64 gps_int_seconds = (static_cast<qint64>(receiver_week) * secs_in_week) + static_cast<qint64>(floor(receiver_tow));
+                double gps_frac_seconds = fmod(receiver_tow, 1.0);
+
+                        // Convert to QDateTime and apply the leap second correction to get UTC
+                QDateTime utc_time = gps_epoch.addSecs(gps_int_seconds).addSecs(-leap_seconds);
+
+                        // Format the string to your desired format
+                QString fractional_str = QString::number(gps_frac_seconds, 'f', 6).mid(1);
+                QString formatted_time = utc_time.toString("yyyy-MMM-dd hh:mm:ss") + fractional_str + " UTC";
+
+                m_gpsTimeLabel->setText(formatted_time);
+            }
+            else if (m_monitorPvt.IsInitialized())
+            {
+                // The receiver is sending data, but it doesn't contain a valid time fix yet.
+                m_gpsTimeLabel->setText("UTC Time: Awaiting PVT fix...");
+            }
+
+                    // Update sky plot with receiver position
             double lat = m_monitorPvt.latitude();
             double lon = m_monitorPvt.longitude();
 
-            // Check for valid GPS coordinates (latitude: -90 to +90, longitude: -180 to +180)
-            // and not exactly (0,0) which is likely uninitialized
             bool validPosition = (lat >= -90.0 && lat <= 90.0 &&
                                   lon >= -180.0 && lon <= 180.0 &&
                                   (std::abs(lat) > 0.001 || std::abs(lon) > 0.001));
@@ -272,6 +312,7 @@ void MainWindow::clearEntries()
     m_altitudeWidget->clear();
     m_DOPWidget->clear();
     m_skyplotWidget->clear();
+    m_gpsTimeLabel->setText("UTC Time: N/A");
 
     m_clear->setEnabled(false);
 }

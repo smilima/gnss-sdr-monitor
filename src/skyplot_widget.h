@@ -128,7 +128,7 @@ private:
     QColor getSystemColor(const std::string &system) const;
     QPointF polarToCartesian(double elevation, double azimuth, const QRect &plotArea) const;
     SatelliteInfo* findSatelliteAt(const QPointF &point);
-    int getSatelliteSize(double cn0) const;
+    int getSatelliteSize(double cn0, int plotRadius) const;
     
     // Orbital mechanics (improved versions)
     double computeSatelliteElevation(int prn, const std::string& system, 
@@ -137,8 +137,8 @@ private:
                                  double receiverLat, double receiverLon, double gpsTime) const;
     
     // Data management
-    std::map<int, std::unique_ptr<SatelliteInfo>> m_satellites;  // key: channel_id
-    
+    std::map<int, std::unique_ptr<SatelliteInfo>> m_satellites;  // key: channel_id    
+
     // Layout areas
     QRect m_plotArea;
     QRect m_legendArea;
@@ -172,6 +172,7 @@ private:
     static constexpr int MIN_WIDGET_SIZE = 300;
     static constexpr int LEGEND_WIDTH = 140;
     static constexpr int DEBUG_HEIGHT = 60;
+    static constexpr int PLOT_PADDING = 0; // Padding in pixels from the edge for the horizon
     static constexpr int DEFAULT_UPDATE_INTERVAL = 100; // ms
     static constexpr int DEFAULT_MAX_MISSED_UPDATES = 5;
 };

@@ -411,6 +411,7 @@ void SkyPlotWidget::drawGrid(QPainter &painter, const QRect &plotArea)
     
     QPointF center = plotArea.center();
     int radius = plotArea.width() / 2;
+    int horizonRadius = radius - PLOT_PADDING;
     
     // Grid pen
     QPen gridPen(QColor(200, 200, 200), 1, Qt::SolidLine);
@@ -425,43 +426,58 @@ void SkyPlotWidget::drawGrid(QPainter &painter, const QRect &plotArea)
     // Draw horizon circle
     QPen horizonPen(QColor(80, 80, 80), 2, Qt::SolidLine);
     painter.setPen(horizonPen);
-    painter.drawEllipse(center, radius, radius);
+    painter.drawEllipse(center, horizonRadius, horizonRadius);
     
     // Draw azimuth lines
     painter.setPen(gridPen);
     for (int azim = 0; azim < 360; azim += 30) {
         double radians = azim * M_PI / 180.0;
-        int x1 = center.x() + radius * sin(radians);
-        int y1 = center.y() - radius * cos(radians);
+        int x1 = center.x() + horizonRadius * sin(radians);
+        int y1 = center.y() - horizonRadius * cos(radians);
         painter.drawLine(center, QPointF(x1, y1));
     }
     
-    // Draw labels
+    // Draw cardinal direction labels - outside circle but within plot area
     QFont labelFont = painter.font();
-    labelFont.setPointSize(9);
+    labelFont.setPointSize(std::max(16, radius / 15)); // Bigger font that scales
     labelFont.setBold(true);
     painter.setFont(labelFont);
-    painter.setPen(QColor(60, 60, 60));
+    painter.setPen(QColor(20, 20, 20)); // Darker for better visibility
     
     QFontMetrics fm(labelFont);
-    int textRadius = radius + 15;
     
-    // Cardinal directions
-    painter.drawText(center.x() - fm.width("N")/2, center.y() - textRadius, "N");
-    painter.drawText(center.x() + textRadius, center.y() + fm.height()/3, "E");
-    painter.drawText(center.x() - fm.width("S")/2, center.y() + textRadius + fm.height(), "S");
-    painter.drawText(center.x() - textRadius - fm.width("W"), center.y() + fm.height()/3, "W");
+    // Set cardinal directions on plot
+    int labelOffset = fm.height() / 2;
+    int labelRadius = radius + labelOffset;
     
-    // Elevation labels
-    labelFont.setPointSize(7);
+    // Ensure we don't go outside plot area bounds
+    int maxLabelRadius = std::min(plotArea.width()/2 - fm.width("W")/2, 
+                                  plotArea.height()/2 - fm.height()/2) - 5;
+    labelRadius = std::min(labelRadius, maxLabelRadius);
+    
+    // North - above circle
+    painter.drawText(center.x() - fm.width("N")/2, center.y() - labelRadius + fm.height()/2, "N");
+    
+    // East - right of circle
+    painter.drawText(center.x() + labelRadius - fm.width("E")/2, center.y() + fm.height()/2, "E");
+    
+    // South - below circle
+    painter.drawText(center.x() - fm.width("S")/2, center.y() + labelRadius + fm.height()/2, "S");
+    
+    // West - left of circle
+    painter.drawText(center.x() - labelRadius - fm.width("W")/2, center.y() + fm.height()/2, "W");
+    
+    // Draw elevation labels
+    labelFont.setPointSize(std::max(7, radius / 25)); // Scale elevation labels
     labelFont.setBold(false);
     painter.setFont(labelFont);
     painter.setPen(QColor(120, 120, 120));
     
     for (int elev = 30; elev <= 60; elev += 30) {
-        int circleRadius = radius * (90 - elev) / 90;
+        int circleRadius = horizonRadius * (90 - elev) / 90;
         QString label = QString("%1°").arg(elev);
-        painter.drawText(center.x() + circleRadius + 3, center.y() + 3, label);
+        // Position elevation labels in the northeast quadrant, inside the circle
+        painter.drawText(center.x() + circleRadius * 0.7, center.y() - circleRadius * 0.7, label);
     }
     
     painter.restore();
@@ -480,7 +496,8 @@ void SkyPlotWidget::drawSatellites(QPainter &painter, const QRect &plotArea)
         QColor color = getSystemColor(sat.system);
         
         // Adjust appearance based on signal quality and status
-        int satSize = getSatelliteSize(sat.cn0);
+        int radius = m_plotArea.width() / 2;
+        int satSize = getSatelliteSize(sat.cn0, radius);
         
         // Dim satellites with poor signal or invalid tracking
         if (!sat.valid || sat.cn0 < 25.0) {
@@ -497,23 +514,29 @@ void SkyPlotWidget::drawSatellites(QPainter &painter, const QRect &plotArea)
         
         // Draw satellite circle with position source indicator
         QPen satPen;
+        QBrush satBrush; // Brush for the fill color
+
         switch (sat.positionSource) {
-            case PositionSource::REAL:
-                satPen = QPen(color.darker(120), 2, Qt::SolidLine);
-                break;
-            case PositionSource::COMPUTED:
-                satPen = QPen(color.darker(120), 1, Qt::DashLine);
-                break;
-            case PositionSource::FALLBACK:
-                satPen = QPen(color.darker(120), 1, Qt::DotLine);
-                break;
-            default:
-                satPen = QPen(Qt::gray, 1, Qt::DashDotLine);
-                break;
+        case PositionSource::REAL:
+            satPen = QPen(color.darker(120), 2, Qt::SolidLine);
+            satBrush = QBrush(color); // Normal fill
+            break;
+        case PositionSource::COMPUTED:
+            satPen = QPen(color.darker(120), 1, Qt::DashLine);
+            satBrush = QBrush(color); // Normal fill
+            break;
+        case PositionSource::FALLBACK:
+            satPen = QPen(color.darker(120), 1, Qt::DotLine);
+            satBrush = Qt::gray; // Gray fill
+            break;
+        default: // This handles PositionSource::NONE
+            satPen = QPen(Qt::gray, 1, Qt::DashDotLine);
+            satBrush = Qt::NoBrush; // No fill
+            break;
         }
-        
+
         painter.setPen(satPen);
-        painter.setBrush(QBrush(color));
+        painter.setBrush(satBrush); // Set the pen and brush
         painter.drawEllipse(pos, satSize/2, satSize/2);
         
         // Draw PRN number
@@ -561,7 +584,7 @@ void SkyPlotWidget::drawLegend(QPainter &painter, const QRect &legendArea)
     painter.setFont(normalFont);
     
     std::map<std::string, QString> systemNames = {
-        {"G", "GPS"}, {"E", "Galileo"}, {"R", "GLONASS"}, {"C", "BeiDou"}
+        {"G", "GPS"}, {"U", "Unknown"}, {"E", "Galileo"}, {"R", "GLONASS"}, {"C", "BeiDou"}
     };
     
     for (const auto &sys : systemNames) {
@@ -670,7 +693,7 @@ QColor SkyPlotWidget::getSystemColor(const std::string &system) const
 QPointF SkyPlotWidget::polarToCartesian(double elevation, double azimuth, const QRect &plotArea) const
 {
     QPointF center = plotArea.center();
-    int radius = plotArea.width() / 2;
+    int radius = (plotArea.width() / 2) - PLOT_PADDING;
     
     // Convert elevation to distance from center
     double distance = radius * (90.0 - elevation) / 90.0;
@@ -685,25 +708,39 @@ QPointF SkyPlotWidget::polarToCartesian(double elevation, double azimuth, const 
     return QPointF(x, y);
 }
 
-int SkyPlotWidget::getSatelliteSize(double cn0) const
+int SkyPlotWidget::getSatelliteSize(double cn0, int plotRadius) const
 {
-    if (cn0 > 45) return 14;
-    if (cn0 > 40) return 12;
-    if (cn0 > 35) return 10;
-    if (cn0 > 30) return 8;
-    return 6;
+    double scale_factor;
+    if      (cn0 > 45) scale_factor = 1.0 / 10.0;  // Largest
+    else if (cn0 > 40) scale_factor = 1.0 / 12.0;
+    else if (cn0 > 35) scale_factor = 1.0 / 18.0;
+    else if (cn0 > 30) scale_factor = 1.0 / 20.0;
+    else               scale_factor = 1.0 / 25.0;  // Smallest
+
+    int calculated_size = static_cast<int>(plotRadius * scale_factor);
+
+    // Ensure satellites don't become invisibly small on a tiny window.
+    const int min_size = 6;
+    return std::max(min_size, calculated_size);
 }
 
 SatelliteInfo* SkyPlotWidget::findSatelliteAt(const QPointF &point)
 {
+    int radius = m_plotArea.width() / 2;
+    
     for (const auto &pair : m_satellites) {
         const SatelliteInfo &sat = *pair.second;
         if (!sat.isPositionValid()) continue;
         
         QPointF satPos = polarToCartesian(sat.elevation, sat.azimuth, m_plotArea);
-        int satSize = getSatelliteSize(sat.cn0);
+        int satSize = getSatelliteSize(sat.cn0, radius);
         
-        QRectF satRect(satPos.x() - satSize/2, satPos.y() - satSize/2, satSize, satSize);
+        // Add a bit of extra margin for easier clicking
+        int clickMargin = std::max(2, radius / 50);
+        QRectF satRect(satPos.x() - (satSize/2 + clickMargin), 
+                       satPos.y() - (satSize/2 + clickMargin), 
+                       satSize + 2*clickMargin, 
+                       satSize + 2*clickMargin);
         if (satRect.contains(point)) {
             return pair.second.get();
         }

@@ -1,5 +1,4 @@
-set(Boost_USE_STATIC_LIBS OFF)
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system)
 if(NOT Boost_FOUND)
      message(FATAL_ERROR "Fatal error: Boost required.")
 endif()

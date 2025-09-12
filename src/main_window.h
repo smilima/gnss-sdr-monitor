@@ -51,6 +51,8 @@
 #include <QXYSeries>
 #include <QtNetwork/QUdpSocket>
 
+class QLabel;
+
 namespace Ui
 {
 class MainWindow;
@@ -94,6 +96,8 @@ private:
     void updateChart(QtCharts::QChart *chart, QtCharts::QXYSeries *series, const QModelIndex &index);
 
     Ui::MainWindow *ui;
+
+    QLabel *m_gpsTimeLabel;
 
     QDockWidget *m_mapDockWidget;
     QDockWidget *m_telecommandDockWidget;
