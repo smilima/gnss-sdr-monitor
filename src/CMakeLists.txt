@@ -41,6 +41,22 @@ set(QT5_LIBRARIES
 
 set(TARGET ${CMAKE_PROJECT_NAME})
 
+set(HEADERS
+    altitude_widget.h
+    channel_table_model.h
+    cn0_delegate.h
+    constellation_delegate.h
+    doppler_delegate.h
+    dop_widget.h
+    led_delegate.h
+    main_window.h
+    monitor_pvt_wrapper.h
+    preferences_dialog.h
+    skyplot_widget.h
+    telecommand_widget.h
+    telnet_manager.h
+)
+
 set(SOURCES
     channel_table_model.cpp
     cn0_delegate.cpp
@@ -70,7 +86,7 @@ set(RESOURCES
     resources.qrc
 )
 
-add_executable(${TARGET} ${SOURCES} ${UI_SOURCES} ${RESOURCES})
+add_executable(${TARGET} ${HEADERS} ${SOURCES} ${UI_SOURCES} ${RESOURCES})
 
 target_link_libraries(${TARGET} PUBLIC ${QT5_LIBRARIES} Boost::boost protobuf::libprotobuf)
 
