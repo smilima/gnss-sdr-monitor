@@ -624,7 +624,7 @@ void SkyPlotWidget::drawLegend(QPainter &painter, const QRect &legendArea)
     painter.setPen(QPen(Qt::black, 1, Qt::DotLine));
     painter.drawLine(x + 2, y - 2, x + 12, y - 2);
     painter.setPen(Qt::black);
-    painter.drawText(x + 18, y, "Fallback");
+    painter.drawText(x + 18, y, "Unknown Position");
     y += 14;
     
     // Statistics
@@ -640,7 +640,7 @@ void SkyPlotWidget::drawLegend(QPainter &painter, const QRect &legendArea)
     y += 12;
     painter.drawText(x, y, QString("Computed: %1").arg(m_satellitesWithComputedPos));
     y += 12;
-    painter.drawText(x, y, QString("Fallback: %1").arg(m_satellitesWithFallbackPos));
+    painter.drawText(x, y, QString("Unknown Position: %1").arg(m_satellitesWithFallbackPos));
     
     painter.restore();
 }
