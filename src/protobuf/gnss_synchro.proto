@@ -34,6 +34,11 @@ message GnssSynchro {
    double rx_time = 23;  // Receiving time after the start of the week, in s
    bool flag_valid_pseudorange = 24;  // Pseudorange computation status
    double interp_tow_ms = 25;  // Interpolated time of week, in ms
+
+   // New satellite position fields
+   optional double satellite_azimuth_deg = 26;
+   optional double satellite_elevation_deg = 27;
+   optional bool flag_valid_satellite_position = 28;
 }
 
 /* Observables represents a collection of GnssSynchro annotations */

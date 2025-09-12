@@ -1,7 +1,7 @@
 /*!
  * \file skyplot_widget.h
  * \brief Interface of a widget that shows satellites being tracked
- * in a polar sky plot.
+ * in a polar sky plot with support for real and computed satellite positions.
  *
  * \author Claude Assistant, 2025.
  *
@@ -38,22 +38,47 @@
 #include <QWidget>
 #include <QPainter>
 #include <QTimer>
+#include <QDateTime>
 #include <map>
+#include <memory>
+
+enum class PositionSource
+{
+    NONE,           // No position data available
+    REAL,           // Real satellite position from GNSS-SDR
+    COMPUTED,       // Computed using receiver position and time
+    FALLBACK        // Fallback pattern-based position
+};
 
 struct SatelliteInfo
 {
+    // Basic satellite information
     int prn;
     std::string system;
     std::string signal;
-    double elevation;    // degrees (0-90)
-    double azimuth;      // degrees (0-360)
-    double cn0;          // dB-Hz
-    bool valid;
     int channel_id;
-    bool seenInThisUpdate; // track if satellite was seen in current update
-    int missedUpdates;     // count of consecutive missed updates
     
-    SatelliteInfo() : prn(0), elevation(0.0), azimuth(0.0), cn0(0.0), valid(false), channel_id(-1), seenInThisUpdate(false), missedUpdates(0) {}
+    // Position information
+    double elevation;        // degrees (0-90)
+    double azimuth;          // degrees (0-360)
+    PositionSource positionSource;
+    
+    // Signal quality
+    double cn0;              // dB-Hz
+    bool valid;              // tracking validity
+    
+    // Tracking state
+    bool seenInThisUpdate;   // updated in current cycle
+    int missedUpdates;       // consecutive missed updates
+    QDateTime lastSeen;      // when last updated
+    
+    // Visual state
+    bool highlighted;        // for user interaction
+    
+    SatelliteInfo();
+    bool isPositionValid() const;
+    QString getSystemName() const;
+    QString getStatusString() const;
 };
 
 class SkyPlotWidget : public QWidget
@@ -62,38 +87,67 @@ class SkyPlotWidget : public QWidget
 
 public:
     explicit SkyPlotWidget(QWidget *parent = nullptr);
+    ~SkyPlotWidget() override = default;
+
+    // Configuration
+    void setMaxMissedUpdates(int maxUpdates) { m_maxMissedUpdates = maxUpdates; }
+    void setUpdateRate(int milliseconds) { m_updateTimer.setInterval(milliseconds); }
+    void setShowDebugInfo(bool show) { m_showDebugInfo = show; update(); }
 
 public slots:
     void updateSatellites(const gnss_sdr::Observables &observables);
     void updateReceiverPosition(const gnss_sdr::MonitorPvt &monitor_pvt);
     void clear();
+    void clearStale(); // Remove satellites not seen recently
 
 protected:
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
 
 private:
+    // Core functionality
+    void processSatellite(const gnss_sdr::GnssSynchro &obs);
+    void cleanupStaleSatellites();
+    void scheduleUpdate();
+    
+    // Position computation
+    bool extractRealPosition(const gnss_sdr::GnssSynchro &obs, double &elevation, double &azimuth);
+    void computeApproximatePosition(const gnss_sdr::GnssSynchro &obs, double &elevation, double &azimuth);
+    void computeFallbackPosition(const gnss_sdr::GnssSynchro &obs, double &elevation, double &azimuth);
+    
+    // Drawing functions
+    void drawBackground(QPainter &painter);
     void drawGrid(QPainter &painter, const QRect &plotArea);
     void drawSatellites(QPainter &painter, const QRect &plotArea);
     void drawLegend(QPainter &painter, const QRect &legendArea);
-    QColor getSystemColor(const std::string &system);
-    QPointF polarToCartesian(double elevation, double azimuth, const QRect &plotArea);
+    void drawDebugInfo(QPainter &painter);
     
-    // Functions for computing satellite positions
-    double computeApproximateElevation(int prn, const std::string& system, double receiver_lat, double receiver_lon, double gps_time);
-    double computeApproximateAzimuth(int prn, const std::string& system, double receiver_lat, double receiver_lon, double gps_time);
+    // Utility functions
+    QColor getSystemColor(const std::string &system) const;
+    QPointF polarToCartesian(double elevation, double azimuth, const QRect &plotArea) const;
+    SatelliteInfo* findSatelliteAt(const QPointF &point);
+    int getSatelliteSize(double cn0) const;
     
-    // Fallback functions when no receiver position is available
-    double computeFallbackElevation(int prn, const std::string& system);
-    double computeFallbackAzimuth(int prn, const std::string& system);
-
-    std::map<int, SatelliteInfo> m_satellites;  // key: channel_id
+    // Orbital mechanics (improved versions)
+    double computeSatelliteElevation(int prn, const std::string& system, 
+                                   double receiverLat, double receiverLon, double gpsTime) const;
+    double computeSatelliteAzimuth(int prn, const std::string& system, 
+                                 double receiverLat, double receiverLon, double gpsTime) const;
+    
+    // Data management
+    std::map<int, std::unique_ptr<SatelliteInfo>> m_satellites;  // key: channel_id
+    
+    // Layout areas
     QRect m_plotArea;
     QRect m_legendArea;
+    QRect m_debugArea;
     
-    // Update timer to limit refresh rate
+    // Update management
     QTimer m_updateTimer;
     bool m_needsUpdate;
+    int m_maxMissedUpdates;
     
     // Receiver position for computing satellite positions
     double m_receiverLat;
@@ -101,6 +155,25 @@ private:
     double m_receiverHeight;
     double m_currentGpsTime;
     bool m_hasReceiverPosition;
+    QDateTime m_lastReceiverUpdate;
+    
+    // Statistics
+    int m_totalSatellites;
+    int m_satellitesWithRealPos;
+    int m_satellitesWithComputedPos;
+    int m_satellitesWithFallbackPos;
+    
+    // User interface state
+    SatelliteInfo* m_hoveredSatellite;
+    SatelliteInfo* m_selectedSatellite;
+    bool m_showDebugInfo;
+    
+    // Visual configuration
+    static constexpr int MIN_WIDGET_SIZE = 300;
+    static constexpr int LEGEND_WIDTH = 140;
+    static constexpr int DEBUG_HEIGHT = 60;
+    static constexpr int DEFAULT_UPDATE_INTERVAL = 100; // ms
+    static constexpr int DEFAULT_MAX_MISSED_UPDATES = 5;
 };
 
 #endif  // GNSS_SDR_MONITOR_SKYPLOT_WIDGET_H_
