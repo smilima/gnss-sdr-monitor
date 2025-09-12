@@ -55,6 +55,7 @@ set(HEADERS
     skyplot_widget.h
     telecommand_widget.h
     telnet_manager.h
+    protobuf/gnss_synchro.proto protobuf/monitor_pvt.proto
 )
 
 set(SOURCES
