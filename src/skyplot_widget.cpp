@@ -34,7 +34,6 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QFontMetrics>
-// #include <QDebug>  // Commented out debug include
 #include <cmath>
 
 #ifndef M_PI
@@ -70,11 +69,23 @@ void SkyPlotWidget::updateReceiverPosition(const gnss_sdr::MonitorPvt &monitor_p
     m_receiverHeight = monitor_pvt.height();
     m_currentGpsTime = monitor_pvt.rx_time();
     m_hasReceiverPosition = true;
+    
+    // Force recomputation of all satellite positions with new receiver position
+    for (auto &pair : m_satellites) {
+        SatelliteInfo &sat = pair.second;
+        sat.elevation = computeApproximateElevation(sat.prn, sat.system, m_receiverLat, m_receiverLon, m_currentGpsTime);
+        sat.azimuth = computeApproximateAzimuth(sat.prn, sat.system, m_receiverLat, m_receiverLon, m_currentGpsTime);
+    }
+    
+    // Schedule an update
+    m_needsUpdate = true;
+    if (!m_updateTimer.isActive()) {
+        m_updateTimer.start();
+    }
 }
 
 /*!
  Updates the satellite information from GNSS observables.
- Simplified approach that mirrors the tableView without interfering.
  */
 void SkyPlotWidget::updateSatellites(const gnss_sdr::Observables &observables)
 {  
@@ -84,19 +95,13 @@ void SkyPlotWidget::updateSatellites(const gnss_sdr::Observables &observables)
     }
     
     // Process each observable in this update
-    // int validObservables = 0;
     for (int i = 0; i < observables.observable_size(); i++)
     {
         const gnss_sdr::GnssSynchro &obs = observables.observable(i);
         
-        // qDebug() << "Observable" << i << "- Channel:" << obs.channel_id() 
-        //          << "PRN:" << obs.prn() << "System:" << QString::fromStdString(obs.system())
-        //          << "fs:" << obs.fs() << "valid:" << obs.flag_valid_symbol_output();
-        
         // Only process valid channels (same logic as the table model)
         if (obs.fs() != 0)
         {
-            // validObservables++;
             int channel_id = obs.channel_id();
             
             SatelliteInfo satInfo;
@@ -108,18 +113,27 @@ void SkyPlotWidget::updateSatellites(const gnss_sdr::Observables &observables)
             satInfo.channel_id = obs.channel_id();
             satInfo.seenInThisUpdate = true;
             
-            // Preserve position if satellite was already being tracked
+            // Preserve position if satellite was already being tracked, but only if position is valid
+            bool hasValidPosition = false;
             if (m_satellites.find(channel_id) != m_satellites.end()) {
-                // Keep existing position for stability
-                satInfo.elevation = m_satellites[channel_id].elevation;
-                satInfo.azimuth = m_satellites[channel_id].azimuth;
-                // qDebug() << "  -> Updating existing satellite, keeping position";
-            } else {
-                // New satellite - use real computation if we have receiver position
+                SatelliteInfo &existingSat = m_satellites[channel_id];
+                if (existingSat.elevation > 0 && existingSat.azimuth >= 0) {
+                    // Keep existing position for stability
+                    satInfo.elevation = existingSat.elevation;
+                    satInfo.azimuth = existingSat.azimuth;
+                    hasValidPosition = true;
+                }
+            }
+            
+            // Compute new position if we don't have a valid one
+            if (!hasValidPosition) {
                 if (m_hasReceiverPosition) {
                     satInfo.elevation = computeApproximateElevation(obs.prn(), obs.system(), m_receiverLat, m_receiverLon, obs.rx_time());
                     satInfo.azimuth = computeApproximateAzimuth(obs.prn(), obs.system(), m_receiverLat, m_receiverLon, obs.rx_time());
-                    // qDebug() << "  -> NEW satellite! Using COMPUTED position - Elev:" << satInfo.elevation << "Az:" << satInfo.azimuth;
+                } else {
+                    // Fallback: Use simplified pattern based on PRN when no receiver position
+                    satInfo.elevation = computeFallbackElevation(obs.prn(), obs.system());
+                    satInfo.azimuth = computeFallbackAzimuth(obs.prn(), obs.system());
                 }
             }
             
@@ -132,17 +146,11 @@ void SkyPlotWidget::updateSatellites(const gnss_sdr::Observables &observables)
     auto it = m_satellites.begin();
     while (it != m_satellites.end()) {
         if (!it->second.seenInThisUpdate) {
-            // qDebug() << "Removing satellite - Channel:" << it->second.channel_id
-            //          << "PRN:" << it->second.prn;
             it = m_satellites.erase(it);
         } else {
             ++it;
         }
     }
-    
-    // qDebug() << "Valid observables processed:" << validObservables;
-    // qDebug() << "Final map size:" << m_satellites.size();
-    // qDebug() << "=== END UPDATE ===\n";
 
     // Schedule an update
     m_needsUpdate = true;
@@ -156,8 +164,7 @@ void SkyPlotWidget::updateSatellites(const gnss_sdr::Observables &observables)
  */
 void SkyPlotWidget::clear()
 {
-    //m_satellites.clear();
-    //m_hasReceiverPosition = false;
+    m_satellites.clear();
     update();
 }
 
@@ -292,7 +299,10 @@ void SkyPlotWidget::drawSatellites(QPainter &painter, const QRect &plotArea)
     {
         const SatelliteInfo &sat = pair.second;
         
-        // drawnCount++;
+        // Skip satellites with invalid positions
+        if (sat.elevation <= 0 || sat.elevation > 90 || sat.azimuth < 0 || sat.azimuth >= 360) {
+            continue;
+        }
         
         QPointF pos = polarToCartesian(sat.elevation, sat.azimuth, plotArea);
         QColor color = getSystemColor(sat.system);
@@ -376,7 +386,7 @@ void SkyPlotWidget::drawLegend(QPainter &painter, const QRect &legendArea)
         y += 16;
     }
     
-    // CN0 scale (removed status section)
+    // CN0 scale
     y += 10;
     painter.setFont(titleFont);
     painter.drawText(legendArea.x() + 5, y, "CN0 Scale:");
@@ -389,10 +399,17 @@ void SkyPlotWidget::drawLegend(QPainter &painter, const QRect &legendArea)
     y += 14;
     painter.drawText(legendArea.x() + 5, y, "< 25 dB-Hz: Small");
     
-    // Simple satellite count - all satellites are treated equally
+    // Satellite count - count only recently seen satellites
+    int activeSatellites = 0;
+    for (const auto &pair : m_satellites) {
+        if (pair.second.missedUpdates <= 3) { // Count satellites that were seen recently
+            activeSatellites++;
+        }
+    }
+    
     y += 20;
     painter.setFont(titleFont);
-    painter.drawText(legendArea.x() + 5, y, QString("Satellites: %1").arg(m_satellites.size()));
+    painter.drawText(legendArea.x() + 5, y, QString("Satellites: %1").arg(activeSatellites));
     
     painter.restore();
 }
@@ -432,63 +449,109 @@ QPointF SkyPlotWidget::polarToCartesian(double elevation, double azimuth, const 
 
 /*!
  Computes approximate satellite elevation based on simplified orbital mechanics.
- Uses PRN-specific orbital patterns for more realistic positioning.
  */
 double SkyPlotWidget::computeApproximateElevation(int prn, const std::string& system, double receiver_lat, double receiver_lon, double gps_time)
 {
-    // Simplified computation based on satellite constellation geometry
     if (system == "G") { // GPS
-        // GPS satellites are in 6 orbital planes, ~55° inclination
         int orbital_plane = (prn - 1) % 6;
-        double time_offset = gps_time + (prn * 3600); // Spread satellites over time
+        double time_offset = gps_time + (prn * 3600);
         double elevation = 15.0 + 55.0 * (0.5 + 0.4 * sin(time_offset / 7200.0 + orbital_plane * M_PI / 3.0));
         return std::min(85.0, std::max(5.0, elevation));
     }
     else if (system == "E") { // Galileo  
-        // Galileo satellites in 3 orbital planes, ~56° inclination
         int orbital_plane = (prn - 1) % 3;
         double time_offset = gps_time + (prn * 3000);
         double elevation = 20.0 + 50.0 * (0.5 + 0.3 * sin(time_offset / 6800.0 + orbital_plane * 2 * M_PI / 3.0));
         return std::min(80.0, std::max(10.0, elevation));
     }
+    else if (system == "R") { // GLONASS
+        int orbital_plane = (prn - 1) % 3;
+        double time_offset = gps_time + (prn * 2800);
+        double elevation = 25.0 + 45.0 * (0.5 + 0.35 * sin(time_offset / 6500.0 + orbital_plane * 2 * M_PI / 3.0));
+        return std::min(80.0, std::max(15.0, elevation));
+    }
+    else if (system == "C") { // BeiDou
+        int orbital_plane = (prn - 1) % 3;
+        double time_offset = gps_time + (prn * 3200);
+        double elevation = 18.0 + 52.0 * (0.5 + 0.38 * sin(time_offset / 7000.0 + orbital_plane * 2 * M_PI / 3.0));
+        return std::min(82.0, std::max(8.0, elevation));
+    }
+    
+    // Fallback for unknown systems
+    return computeFallbackElevation(prn, system);
 }
 
 /*!
  Computes approximate satellite azimuth based on simplified orbital mechanics.
- Uses PRN-specific orbital patterns for more realistic positioning.
  */
 double SkyPlotWidget::computeApproximateAzimuth(int prn, const std::string& system, double receiver_lat, double receiver_lon, double gps_time)
 {
+    double azimuth = 0.0;
+    
     if (system == "G") { // GPS
-        // Approximate azimuth based on orbital plane and time
         int orbital_plane = (prn - 1) % 6;
         double time_offset = gps_time + (prn * 3600);
         double base_azimuth = orbital_plane * 60.0; // 6 planes spaced 60° apart
-        double azimuth = base_azimuth + 30.0 * sin(time_offset / 5400.0);
-        
-        // Adjust for receiver longitude
+        azimuth = base_azimuth + 30.0 * sin(time_offset / 5400.0);
         azimuth += receiver_lon * 0.1;
-        
-        // Ensure 0-360 range
-        while (azimuth < 0) azimuth += 360.0;
-        while (azimuth >= 360.0) azimuth -= 360.0;
-        
-        return azimuth;
     }
     else if (system == "E") { // Galileo
-        // Galileo constellation pattern
         int orbital_plane = (prn - 1) % 3;
         double time_offset = gps_time + (prn * 3000);
         double base_azimuth = orbital_plane * 120.0; // 3 planes spaced 120° apart
-        double azimuth = base_azimuth + 40.0 * sin(time_offset / 6000.0);
-        
-        // Adjust for receiver longitude
+        azimuth = base_azimuth + 40.0 * sin(time_offset / 6000.0);
         azimuth += receiver_lon * 0.15;
-        
-        // Ensure 0-360 range
-        while (azimuth < 0) azimuth += 360.0;
-        while (azimuth >= 360.0) azimuth -= 360.0;
-        
-        return azimuth;
     }
+    else if (system == "R") { // GLONASS
+        int orbital_plane = (prn - 1) % 3;
+        double time_offset = gps_time + (prn * 2800);
+        double base_azimuth = orbital_plane * 120.0; // 3 planes spaced 120° apart
+        azimuth = base_azimuth + 35.0 * sin(time_offset / 5800.0);
+        azimuth += receiver_lon * 0.12;
+    }
+    else if (system == "C") { // BeiDou
+        int orbital_plane = (prn - 1) % 3;
+        double time_offset = gps_time + (prn * 3200);
+        double base_azimuth = orbital_plane * 120.0; // 3 planes spaced 120° apart
+        azimuth = base_azimuth + 42.0 * sin(time_offset / 6200.0);
+        azimuth += receiver_lon * 0.13;
+    }
+    else {
+        // Fallback for unknown systems
+        return computeFallbackAzimuth(prn, system);
+    }
+    
+    // Ensure 0-360 range
+    while (azimuth < 0) azimuth += 360.0;
+    while (azimuth >= 360.0) azimuth -= 360.0;
+    
+    return azimuth;
+}
+
+/*!
+ Computes fallback elevation when no receiver position is available.
+ */
+double SkyPlotWidget::computeFallbackElevation(int prn, const std::string& system)
+{
+    // Simple pattern based on PRN to spread satellites around the sky
+    double baseElevation = 30.0 + (prn % 6) * 10.0; // 30°-80° range
+    return std::min(80.0, std::max(20.0, baseElevation));
+}
+
+/*!
+ Computes fallback azimuth when no receiver position is available.
+ */
+double SkyPlotWidget::computeFallbackAzimuth(int prn, const std::string& system)
+{
+    // Spread satellites evenly around the compass
+    double azimuth = fmod(prn * 37.0, 360.0);  // Correct: fmod() works with double
+    
+    // Add system-specific offset to group by constellation
+    if (system == "G") azimuth += 0.0;
+    else if (system == "E") azimuth += 90.0;
+    else if (system == "R") azimuth += 180.0;
+    else if (system == "C") azimuth += 270.0;
+    
+    while (azimuth >= 360.0) azimuth -= 360.0;
+    return azimuth;
 }

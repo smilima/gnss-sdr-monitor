@@ -51,6 +51,9 @@ struct SatelliteInfo
     bool valid;
     int channel_id;
     bool seenInThisUpdate; // track if satellite was seen in current update
+    int missedUpdates;     // count of consecutive missed updates
+    
+    SatelliteInfo() : prn(0), elevation(0.0), azimuth(0.0), cn0(0.0), valid(false), channel_id(-1), seenInThisUpdate(false), missedUpdates(0) {}
 };
 
 class SkyPlotWidget : public QWidget
@@ -76,9 +79,13 @@ private:
     QColor getSystemColor(const std::string &system);
     QPointF polarToCartesian(double elevation, double azimuth, const QRect &plotArea);
     
-    // New functions for computing real satellite positions
+    // Functions for computing satellite positions
     double computeApproximateElevation(int prn, const std::string& system, double receiver_lat, double receiver_lon, double gps_time);
     double computeApproximateAzimuth(int prn, const std::string& system, double receiver_lat, double receiver_lon, double gps_time);
+    
+    // Fallback functions when no receiver position is available
+    double computeFallbackElevation(int prn, const std::string& system);
+    double computeFallbackAzimuth(int prn, const std::string& system);
 
     std::map<int, SatelliteInfo> m_satellites;  // key: channel_id
     QRect m_plotArea;

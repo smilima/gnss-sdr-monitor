@@ -241,13 +241,25 @@ void MainWindow::receiveMonitorPvt()
     while (m_socketMonitorPvt->hasPendingDatagrams())
     {
         QNetworkDatagram datagram = m_socketMonitorPvt->receiveDatagram();
-        m_monitorPvt =
-            readMonitorPvt(datagram.data().data(), datagram.data().size());
+        m_monitorPvt = readMonitorPvt(datagram.data().data(), datagram.data().size());
 
         if (m_stop->isEnabled())
         {
             m_monitorPvtWrapper->addMonitorPvt(m_monitorPvt);
-            // clear->setEnabled(true);
+
+            // Update sky plot with receiver position if coordinates are valid
+            double lat = m_monitorPvt.latitude();
+            double lon = m_monitorPvt.longitude();
+
+            // Check for valid GPS coordinates (latitude: -90 to +90, longitude: -180 to +180)
+            // and not exactly (0,0) which is likely uninitialized
+            bool validPosition = (lat >= -90.0 && lat <= 90.0 &&
+                                  lon >= -180.0 && lon <= 180.0 &&
+                                  (std::abs(lat) > 0.001 || std::abs(lon) > 0.001));
+
+            if (validPosition) {
+                m_skyplotWidget->updateReceiverPosition(m_monitorPvt);
+            }
         }
     }
 }
@@ -259,7 +271,7 @@ void MainWindow::clearEntries()
 
     m_altitudeWidget->clear();
     m_DOPWidget->clear();
-    //m_skyplotWidget->clear();
+    m_skyplotWidget->clear();
 
     m_clear->setEnabled(false);
 }

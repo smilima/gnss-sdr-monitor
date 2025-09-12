@@ -55,6 +55,7 @@ set(SOURCES
     telnet_manager.cpp
     altitude_widget.cpp
     dop_widget.cpp
+    skyplot_widget.cpp
     ${PROTO_SRCS}
     ${PROTO_SRCS2}
 )
@@ -69,8 +70,7 @@ set(RESOURCES
     resources.qrc
 )
 
-add_executable(${TARGET} ${SOURCES} ${UI_SOURCES} ${RESOURCES}
-    skyplot_widget.cpp skyplot_widget.h)
+add_executable(${TARGET} ${SOURCES} ${UI_SOURCES} ${RESOURCES})
 
 target_link_libraries(${TARGET} PUBLIC ${QT5_LIBRARIES} Boost::boost protobuf::libprotobuf)
 
