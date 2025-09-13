@@ -68,6 +68,7 @@ QString SatelliteInfo::getSystemName() const
     if (system == "C") return "BeiDou";
     if (system == "J") return "QZSS";
     if (system == "I") return "IRNSS";
+    if (system == "S") return "SBAS";
     return "Unknown";
 }
 

@@ -38,6 +38,7 @@
 #include "dop_widget.h"
 #include "gnss_synchro.pb.h"
 #include "monitor_pvt.pb.h"
+#include "gps_ephemeris_wrapper.h"
 #include "monitor_pvt_wrapper.h"
 #include "telecommand_widget.h"
 #include "skyplot_widget.h"
@@ -73,8 +74,8 @@ public:
 
     gnss_sdr::Observables readGnssSynchro(char buff[], int bytes);
     gnss_sdr::MonitorPvt readMonitorPvt(char buff[], int bytes);
-    void saveSettings();
     void loadSettings();
+    void saveSettings();
 
 public slots:
     void toggleCapture();
@@ -116,7 +117,9 @@ private:
     QUdpSocket *m_socketMonitorPvt;
     gnss_sdr::Observables m_stocks;
     MonitorPvtWrapper *m_monitorPvtWrapper;
+    GpsEphemerisWrapper *m_GpsEphemerisWrapper;
     gnss_sdr::MonitorPvt m_monitorPvt;
+
     std::vector<int> m_channels;
     quint16 m_portGnssSynchro;
     quint16 m_portMonitorPvt;

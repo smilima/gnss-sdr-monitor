@@ -204,8 +204,8 @@ void MainWindow::updateChart(QtCharts::QChart *chart, QtCharts::QXYSeries *serie
 
     series->replace(points);
 
-    chart->axes(Qt::Horizontal).back()->setRange(min_x, max_x);
-    chart->axes(Qt::Vertical).back()->setRange(min_y, max_y);
+    chart->axes(Qt::Horizontal).constLast()->setRange(min_x, max_x);
+    chart->axes(Qt::Vertical).constLast()->setRange(min_y, max_y);
 }
 
 void MainWindow::toggleCapture()
