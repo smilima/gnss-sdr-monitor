@@ -35,7 +35,7 @@
 #include <QPainter>
 #include <QMouseEvent>
 #include <QFontMetrics>
-#include <QDebug>
+//#include <QDebug>
 #include <QToolTip>
 #include <cmath>
 #include <algorithm>
@@ -114,7 +114,7 @@ SkyPlotWidget::SkyPlotWidget(QWidget *parent)
         }
     });
     
-    qDebug() << "SkyPlotWidget initialized";
+    //qDebug() << "SkyPlotWidget initialized";
 }
 
 void SkyPlotWidget::updateReceiverPosition(const gnss_sdr::MonitorPvt &monitor_pvt)
@@ -142,7 +142,7 @@ void SkyPlotWidget::updateReceiverPosition(const gnss_sdr::MonitorPvt &monitor_p
         m_lastReceiverUpdate = QDateTime::currentDateTime();
         
         if (positionChanged) {
-            qDebug() << "Receiver position updated:" << m_receiverLat << m_receiverLon;
+            //qDebug() << "Receiver position updated:" << m_receiverLat << m_receiverLon;
             
             // Recompute positions for satellites using computed positions
             for (auto &pair : m_satellites) {
@@ -208,17 +208,17 @@ void SkyPlotWidget::processSatellite(const gnss_sdr::GnssSynchro &obs)
     std::unique_ptr<SatelliteInfo> &satPtr = m_satellites[channel_id];
     if (!satPtr) {
         satPtr = std::make_unique<SatelliteInfo>();
-        qDebug() << "New satellite detected: PRN" << obs.prn() 
-                 << "System" << QString::fromStdString(obs.system())
-                 << "Channel" << channel_id;
+        // qDebug() << "New satellite detected: PRN" << obs.prn()
+        //          << "System" << QString::fromStdString(obs.system())
+        //          << "Channel" << channel_id;
     }
     
     SatelliteInfo &sat = *satPtr;
     
     // Check if PRN changed (channel reassignment)
     if (sat.prn != 0 && sat.prn != obs.prn()) {
-        qDebug() << "Channel" << channel_id << "reassigned from PRN" << sat.prn 
-                 << "to PRN" << obs.prn();
+        // qDebug() << "Channel" << channel_id << "reassigned from PRN" << sat.prn
+        //          << "to PRN" << obs.prn();
         // Reset position source to force recomputation
         sat.positionSource = PositionSource::NONE;
     }
@@ -242,8 +242,8 @@ void SkyPlotWidget::processSatellite(const gnss_sdr::GnssSynchro &obs)
     if (extractRealPosition(obs, elevation, azimuth)) {
         newPositionSource = PositionSource::REAL;
         if (sat.positionSource != PositionSource::REAL) {
-            qDebug() << "Now using real position for PRN" << obs.prn()
-                     << "El:" << elevation << "Az:" << azimuth;
+            // qDebug() << "Now using real position for PRN" << obs.prn()
+            //          << "El:" << elevation << "Az:" << azimuth;
         }
     }
     // Try computed position if we have receiver position
@@ -286,8 +286,8 @@ bool SkyPlotWidget::extractRealPosition(const gnss_sdr::GnssSynchro &obs,
                 azimuth = az;
                 return true;
             } else {
-                qWarning() << "Invalid real satellite position for PRN" << obs.prn()
-                           << "El:" << el << "Az:" << az;
+                // qWarning() << "Invalid real satellite position for PRN" << obs.prn()
+                //            << "El:" << el << "Az:" << az;
             }
         }
     }
@@ -327,8 +327,8 @@ void SkyPlotWidget::cleanupStaleSatellites()
             sat.missedUpdates++;
             
             if (sat.missedUpdates > m_maxMissedUpdates) {
-                qDebug() << "Removing stale satellite: PRN" << sat.prn 
-                         << "Channel" << sat.channel_id;
+                // qDebug() << "Removing stale satellite: PRN" << sat.prn
+                //          << "Channel" << sat.channel_id;
                 
                 // Clear hover/selection if this satellite is being removed
                 if (m_hoveredSatellite == &sat) m_hoveredSatellite = nullptr;
@@ -344,7 +344,7 @@ void SkyPlotWidget::cleanupStaleSatellites()
 
 void SkyPlotWidget::clear()
 {
-    qDebug() << "Clearing all satellite data";
+    //qDebug() << "Clearing all satellite data";
     m_satellites.clear();
     m_hoveredSatellite = nullptr;
     m_selectedSatellite = nullptr;
