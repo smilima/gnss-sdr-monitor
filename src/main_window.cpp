@@ -37,6 +37,7 @@
 #include "led_delegate.h"
 #include "preferences_dialog.h"
 #include "skyplot_widget.h"
+#include "ephemeris_widget.h"
 #include "ui_main_window.h"
 #include <QDebug>
 #include <QQmlContext>
@@ -103,6 +104,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_skyplotDockWidget->setWidget(m_skyplotWidget);
     addDockWidget(Qt::TopDockWidgetArea, m_skyplotDockWidget);
 
+    // Ephemeris widget.
+    m_ephemerisDockWidget = new QDockWidget("Ephemeris Data", this);
+    m_ephemerisWidget = new EphemerisWidget(m_ephemerisDockWidget);
+    m_ephemerisDockWidget->setWidget(m_ephemerisWidget);
+    addDockWidget(Qt::BottomDockWidgetArea, m_ephemerisDockWidget);
+    m_ephemerisDockWidget->setHidden(false);
+
     // QMenuBar.
     ui->actionQuit->setIcon(QIcon::fromTheme("application-exit"));
     ui->actionQuit->setShortcuts(QKeySequence::Quit);
@@ -125,9 +133,12 @@ MainWindow::MainWindow(QWidget *parent)
     ui->mainToolBar->addAction(m_altitudeDockWidget->toggleViewAction());
     ui->mainToolBar->addAction(m_DOPDockWidget->toggleViewAction());
     ui->mainToolBar->addAction(m_skyplotDockWidget->toggleViewAction());
+    ui->mainToolBar->addAction(m_ephemerisDockWidget->toggleViewAction());
+
     m_start->setEnabled(false);
     m_stop->setEnabled(true);
     m_clear->setEnabled(false);
+
     connect(m_start, &QAction::triggered, this, &MainWindow::toggleCapture);
     connect(m_stop, &QAction::triggered, this, &MainWindow::toggleCapture);
     connect(m_clear, &QAction::triggered, this, &MainWindow::clearEntries);
@@ -157,10 +168,12 @@ MainWindow::MainWindow(QWidget *parent)
     // Sockets.
     m_socketGnssSynchro = new QUdpSocket(this);
     m_socketMonitorPvt = new QUdpSocket(this);
+    m_socketGpsEphemeris = new QUdpSocket(this);
 
     // Connect Signals & Slots.
     connect(m_socketGnssSynchro, &QUdpSocket::readyRead, this, &MainWindow::receiveGnssSynchro);
     connect(m_socketMonitorPvt, &QUdpSocket::readyRead, this, &MainWindow::receiveMonitorPvt);
+    connect(m_socketGpsEphemeris, &QUdpSocket::readyRead, this, &MainWindow::receiveGpsEphemeris);
     connect(qApp, &QApplication::aboutToQuit, this, &MainWindow::quit);
     connect(ui->tableView, &QTableView::clicked, this, &MainWindow::expandPlot);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
@@ -245,10 +258,6 @@ void MainWindow::receiveGnssSynchro()
     }
 }
 
-// main_window.cpp
-
-// main_window.cpp
-
 void MainWindow::receiveMonitorPvt()
 {
     while (m_socketMonitorPvt->hasPendingDatagrams())
@@ -313,6 +322,7 @@ void MainWindow::clearEntries()
     m_altitudeWidget->clear();
     m_DOPWidget->clear();
     m_skyplotWidget->clear();
+    m_ephemerisWidget->clear();
     m_gpsTimeLabel->setText("UTC Time: N/A");
 
     m_clear->setEnabled(false);
@@ -348,6 +358,36 @@ gnss_sdr::MonitorPvt MainWindow::readMonitorPvt(char buff[], int bytes)
     }
 
     return m_monitorPvt;
+}
+
+gnss_sdr::GpsEphemeris MainWindow::readGpsEphemeris(char buff[], int bytes)
+{
+    try
+    {
+        std::string data(buff, bytes);
+        m_gpsEphemeris.ParseFromString(data);
+    }
+    catch (std::exception &e)
+    {
+        qDebug() << e.what();
+    }
+
+    return m_gpsEphemeris;
+}
+
+void MainWindow::receiveGpsEphemeris()
+{
+    while (m_socketGpsEphemeris->hasPendingDatagrams())
+    {
+        QNetworkDatagram datagram = m_socketGpsEphemeris->receiveDatagram();
+        m_gpsEphemeris = readGpsEphemeris(datagram.data().data(), datagram.data().size());
+
+        if (m_stop->isEnabled())
+        {
+            m_GpsEphemerisWrapper->addGpsEphemeris(m_gpsEphemeris);
+            m_ephemerisWidget->updateEphemeris(m_gpsEphemeris);
+        }
+    }
 }
 
 void MainWindow::saveSettings()
@@ -408,11 +448,13 @@ void MainWindow::setPort()
     settings.beginGroup("Preferences_Dialog");
     m_portGnssSynchro = settings.value("port_gnss_synchro", 1111).toInt();
     m_portMonitorPvt = settings.value("port_monitor_pvt", 1112).toInt();
+    m_portGpsEphemeris = settings.value("port_gps_ephemeris", 1113).toInt();
     settings.endGroup();
 
     m_socketGnssSynchro->disconnectFromHost();
     m_socketGnssSynchro->bind(QHostAddress::Any, m_portGnssSynchro);
     m_socketMonitorPvt->bind(QHostAddress::Any, m_portMonitorPvt);
+    m_socketGpsEphemeris->bind(QHostAddress::Any, m_portGpsEphemeris);
 }
 
 void MainWindow::expandPlot(const QModelIndex &index)

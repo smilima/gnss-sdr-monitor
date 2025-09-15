@@ -52,6 +52,7 @@ set(HEADERS
     constellation_delegate.h
     doppler_delegate.h
     dop_widget.h
+    ephemeris_widget.h
     led_delegate.h
     main_window.h
     monitor_pvt_wrapper.h
@@ -70,6 +71,7 @@ set(SOURCES
     cn0_delegate.cpp
     constellation_delegate.cpp
     doppler_delegate.cpp
+    ephemeris_widget.cpp
     led_delegate.cpp
     main.cpp
     main_window.cpp
