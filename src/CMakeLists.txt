@@ -99,7 +99,8 @@ set(RESOURCES
     ../screenshots/gnss-sdr-monitor-skyplot.png
 )
 
-add_executable(${TARGET} ${HEADERS} ${SOURCES} ${UI_SOURCES} ${RESOURCES})
+add_executable(${TARGET} ${HEADERS} ${SOURCES} ${UI_SOURCES} ${RESOURCES}
+     )
 
 
 target_link_libraries(gnss-sdr-monitor PRIVATE Qt5::Core)
