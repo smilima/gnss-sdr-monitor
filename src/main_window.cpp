@@ -60,6 +60,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Monitor_Pvt_Wrapper.
     m_monitorPvtWrapper = new MonitorPvtWrapper();
+    m_GpsEphemerisWrapper = new GpsEphemerisWrapper();
 
     // Telecommand widget.
     m_telecommandDockWidget = new QDockWidget("Telecommand", this);
@@ -150,8 +151,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableView->setItemDelegateForColumn(6, new Cn0Delegate());
     ui->tableView->setItemDelegateForColumn(7, new DopplerDelegate());
     ui->tableView->setItemDelegateForColumn(9, new LedDelegate());
-    // ui->tableView->setAlternatingRowColors(true);
-    // ui->tableView->setSelectionBehavior(QTableView::SelectRows);
+    ui->tableView->setAlternatingRowColors(true);
+    ui->tableView->setSelectionBehavior(QTableView::SelectRows);
 
     // Sockets.
     m_socketGnssSynchro = new QUdpSocket(this);
